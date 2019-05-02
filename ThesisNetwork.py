@@ -2,12 +2,16 @@ from tkinter import *
 import math
 import time
 import random
+import statistics
 import numpy as np
 import sys
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['text.usetex'] = True
 matplotlib.rcParams['text.latex.unicode'] = True
+matplotlib.rc('font', **{
+        'weight' : 'bold',
+        'size'   : 12})
 
 np.set_printoptions(threshold=sys.maxsize)
 
@@ -15,13 +19,13 @@ np.set_printoptions(threshold=sys.maxsize)
 ##### --------------------------- VARIABLES ---------------------------
 
 #Simulation mode random=0, logic=1
-FindEPN = 0
+FindEPN = 1
 
 #Simulation mode random=0, logic=1
-FindCore = 0
+FindCore = 1
 
 #Plotting mode none=0 FLPLeaf-Core=1 Core-EPNLeaf=2 EPNs=3 ThesisMode=4
-plottingMode = 4
+plottingMode = 0
 
 #Showing only values from overflow rounds 0=no 1=yes
 onlyOverflow = 0
@@ -29,9 +33,16 @@ onlyOverflow = 0
 #Simulation data
 FLP_sending_rate = 25
 EPN_receiving_rate = 100
+processing_time_mean = 38           #36 seconds is the maximum limitation
 
 speed = 0
-rounds_displayed = 10000
+rounds_displayed = 3000
+
+#key figures
+amount_overflows = 0
+amount_data_loss = 0
+sd_FLPLeaf_Core = 0
+sd_Core_EPNLeaf = 0
 
 
 #important constants
@@ -44,7 +55,7 @@ num_Core = 5
 num_EPNLeaf = 14
 num_EPN = 756
 EPN_per_row = 18
-num_EPN_slots = 3
+num_EPN_slots = 2
 
 cap_FLP_to_FLPLeaf = 1
 cap_FLPLeaf_to_Core = 3
@@ -182,8 +193,11 @@ if(plottingMode==4):
 plottingArray = np.zeros((fdim, rounds_displayed))
 plottingArray_cr_EPN = np.zeros((num_Core*num_EPNLeaf*cap_Core_to_EPNLeaf, rounds_displayed))
 plottingArray_FLP_cr = np.zeros((num_FLPLeaf*num_Core*cap_FLPLeaf_to_Core, rounds_displayed))
+plottingArray_FLPsend = np.zeros((num_FLP, rounds_displayed))
 
-plottingArray_amounts = np.zeros(21)
+plottingArrayEPN_amounts = np.zeros(21)
+plottingArrayFLP_amounts = np.zeros(21)
+
 
 
 ##### --------------------------- MAPPING IN NETWORK ---------------------------
@@ -195,9 +209,9 @@ if(FindEPN == 1):
     x=0
     y=0
     for i in range(num_EPN):
-        EPN_array.append(x)
-        if x+54 < num_EPN:
-            x += 54
+        EPN_array.append(int(x))
+        if x+num_EPN/num_EPNLeaf < num_EPN:
+            x += num_EPN/num_EPNLeaf
         else:
             y+=1
             x=y
@@ -214,10 +228,10 @@ for i in range(num_EPN):
 
 
 def calculateEPNs():
-    chosenEPN = random.randint(0,755)
+    chosenEPN = random.randint(0,num_EPN-1)
     if(len(EPN_array)>1):
-        while(EPN[chosenEPN] != 0 or EPN_slots[chosenEPN]>2 or EPN_array[len(EPN_array)-1]==chosenEPN):
-            chosenEPN = random.randint(0, 755)
+        while(EPN[chosenEPN] != 0 or EPN_slots[chosenEPN]>1 or EPN_array[len(EPN_array)-1]==chosenEPN):
+            chosenEPN = random.randint(0, num_EPN-1)
     EPN_array.append(chosenEPN)
 
 
@@ -312,48 +326,48 @@ def findNodes():
             if(FindEPN == 0):
                 node_EPN = EPN_array[buffer[0]]
             else:
-                node_EPN = EPN_array[buffer[0] % 756]
+                node_EPN = EPN_array[buffer[0] % num_EPN]
 
-            EPN[node_EPN] += FLP_sending_rate
+            EPN[int(node_EPN)] += FLP_sending_rate
 
             #calculate the EPNLeaf to connect to EPN
-            if node_EPN<54:
+            if node_EPN<num_EPN/num_EPNLeaf :
                 EPNLeaf[0] += FLP_sending_rate
                 node_EPNLeaf=0
-            elif node_EPN>=54 and node_EPN<54*2:
+            elif node_EPN>=num_EPN/num_EPNLeaf  and node_EPN<num_EPN/num_EPNLeaf *2:
                 EPNLeaf[1] += FLP_sending_rate
                 node_EPNLeaf=1
-            elif node_EPN>=54*2 and node_EPN<54*3:
+            elif node_EPN>=num_EPN/num_EPNLeaf *2 and node_EPN<num_EPN/num_EPNLeaf *3:
                 EPNLeaf[2] += FLP_sending_rate
                 node_EPNLeaf=2
-            elif node_EPN>=54*3 and node_EPN<54*4:
+            elif node_EPN>=num_EPN/num_EPNLeaf *3 and node_EPN<num_EPN/num_EPNLeaf *4:
                 EPNLeaf[3] += FLP_sending_rate
                 node_EPNLeaf=3
-            elif node_EPN>=54*4 and node_EPN<54*5:
+            elif node_EPN>=num_EPN/num_EPNLeaf *4 and node_EPN<num_EPN/num_EPNLeaf *5:
                 EPNLeaf[4] += FLP_sending_rate
                 node_EPNLeaf=4
-            elif node_EPN>=54*5 and node_EPN<54*6:
+            elif node_EPN>=num_EPN/num_EPNLeaf *5 and node_EPN<num_EPN/num_EPNLeaf *6:
                 EPNLeaf[5] += FLP_sending_rate
                 node_EPNLeaf=5
-            elif node_EPN>=54*6 and node_EPN<54*7:
+            elif node_EPN>=num_EPN/num_EPNLeaf *6 and node_EPN<num_EPN/num_EPNLeaf *7:
                 EPNLeaf[6] += FLP_sending_rate
                 node_EPNLeaf=6
-            elif node_EPN>=54*7 and node_EPN<54*8:
+            elif node_EPN>=num_EPN/num_EPNLeaf *7 and node_EPN<num_EPN/num_EPNLeaf *8:
                 EPNLeaf[7] += FLP_sending_rate
                 node_EPNLeaf=7
-            elif node_EPN>=54*8 and node_EPN<54*9:
+            elif node_EPN>=num_EPN/num_EPNLeaf *8 and node_EPN<num_EPN/num_EPNLeaf *9:
                 EPNLeaf[8] += FLP_sending_rate
                 node_EPNLeaf=8
-            elif node_EPN>=54*9 and node_EPN<54*10:
+            elif node_EPN>=num_EPN/num_EPNLeaf *9 and node_EPN<num_EPN/num_EPNLeaf *10:
                 EPNLeaf[9] += FLP_sending_rate
                 node_EPNLeaf=9
-            elif node_EPN>=54*10 and node_EPN<54*11:
+            elif node_EPN>=num_EPN/num_EPNLeaf *10 and node_EPN<num_EPN/num_EPNLeaf *11:
                 EPNLeaf[10] += FLP_sending_rate
                 node_EPNLeaf=10
-            elif node_EPN>=54*11 and node_EPN<54*12:
+            elif node_EPN>=num_EPN/num_EPNLeaf *11 and node_EPN<num_EPN/num_EPNLeaf *12:
                 EPNLeaf[11] += FLP_sending_rate
                 node_EPNLeaf=11
-            elif node_EPN>=54*12 and node_EPN<54*13:
+            elif node_EPN>=num_EPN/num_EPNLeaf *12 and node_EPN<num_EPN/num_EPNLeaf *13:
                 EPNLeaf[12] += FLP_sending_rate
                 node_EPNLeaf=12
             else:
@@ -362,14 +376,14 @@ def findNodes():
 
             #calculate the Core to connect between EPNLeaf and FLPLeaf
             if FindCore==1:
-                node_Core = EPNLeaf_array[node_EPN]
+                node_Core = EPNLeaf_array[int(node_EPN)]
             else:
                 node_Core = random.randint(0, 4)
             Core[node_Core] += FLP_sending_rate
 
             #calculate the links between the chosen Switches
             FLP_to_FLPLeaf[i] += FLP_sending_rate
-            FLPLeaf_to_Core[node_FLPLeaf     *     num_Core *3    +       node_Core*3    +node_EPN%3] += FLP_sending_rate
+            FLPLeaf_to_Core[node_FLPLeaf * num_Core *3 + node_Core*3 + node_EPN%3] += FLP_sending_rate
             Core_to_EPNLeaf[node_Core*num_EPNLeaf+node_EPNLeaf] += FLP_sending_rate
             EPNLeaf_to_EPN[node_EPN] += FLP_sending_rate
 
@@ -379,7 +393,7 @@ def findNodes():
 
             #calculate the total throughput in a simulation
             FLP_to_FLPLeaf_total[i] += FLP_sending_rate
-            FLPLeaf_to_Core_total[node_FLPLeaf * num_Core + node_Core] += FLP_sending_rate
+            FLPLeaf_to_Core_total[node_FLPLeaf * num_Core *3 + node_Core*3 + node_EPN%3] += FLP_sending_rate
             Core_to_EPNLeaf_total[node_Core * num_EPNLeaf + node_EPNLeaf] += FLP_sending_rate
             EPNLeaf_to_EPN_total[node_EPN] += FLP_sending_rate
 
@@ -389,19 +403,19 @@ def findNodes():
         if(EPN[i]>=160*FLP_sending_rate):
             EPN[i] = 0
             processing_time = 0
-            randInt = random.randint(0,99)
+            randInt = 1 #random.randint(0,99)
             if(randInt<63):
-                processing_time=30
+                processing_time=processing_time_mean
             elif(randInt>=63 and randInt<86):
-                processing_time=31
+                processing_time=processing_time_mean+1
             elif(randInt>=86 and randInt<94):
-                processing_time=32
+                processing_time=processing_time_mean+2
             elif(randInt>=94 and randInt<97):
-                processing_time=33
+                processing_time=processing_time_mean+3
             elif(randInt>=97 and randInt<99):
-                processing_time=34
+                processing_time=processing_time_mean+4
             else:
-                processing_time=35
+                processing_time=processing_time_mean+5
             if (EPN_process[i][0] == 0):
                 EPN_process[i][0] += processing_time*40
             else:
@@ -411,7 +425,7 @@ def findNodes():
                     if (EPN_process[i][2] == 0):
                         EPN_process[i][2] += processing_time*40
 
-        for j in range(3):
+        for j in range(2):
             if EPN_process[i][j]>0:
                 EPN_process[i][j] -= 1
                 counter += 1
@@ -515,6 +529,15 @@ def drawConnections():
                 lineWeight = 3
                 global overflow_rounds_FLPLeaf_Core
                 overflow_rounds_FLPLeaf_Core[round] = 1
+                global amount_overflows
+                global amount_data_loss
+                amount_overflows += 1
+                if FLPLeaf_to_Core[i*num_Core*3+j*3] > 200:
+                    amount_data_loss += FLPLeaf_to_Core[i*num_Core*3+j*3]
+                if FLPLeaf_to_Core[i*num_Core*3+j*3+1] > 200:
+                    amount_data_loss += FLPLeaf_to_Core[i*num_Core*3+j*3+1]
+                if FLPLeaf_to_Core[i*num_Core*3+j*3+2] > 200:
+                    amount_data_loss += FLPLeaf_to_Core[i*num_Core*3+j*3+2]
             canvas.create_line(size_FLPLeaf/2+200, i*size_FLPLeaf*2+(10+size_FLPLeaf/2)+size_FLPLeaf/2, 450, j*size_Core*2+(10+size_Core/2)+size_Core/2, fill=color, width=lineWeight)
 
     for i in range(num_Core):
@@ -532,6 +555,8 @@ def drawConnections():
                 lineWeight = 3
                 global overflow_rounds_Core_EPNLeaf
                 overflow_rounds_Core_EPNLeaf[round] = 1
+                amount_overflows += 1
+                amount_data_loss += Core_to_EPNLeaf[i * num_EPNLeaf + j]
             canvas.create_line(size_Core/2+450, i*size_Core*2+(10+size_Core/2)+size_Core/2, 750, j*size_EPNLeaf*2+(10+size_EPNLeaf/2)+size_EPNLeaf/2, fill=color, width=lineWeight)
 
     for i in range(num_EPNLeaf):
@@ -549,7 +574,8 @@ def drawConnections():
                 lineWeight = 2
                 global overflow_rounds_EPNLeaf_EPN
                 overflow_rounds_EPNLeaf_EPN[round] = 1
-                print(EPN_array)
+                amount_overflows += 1
+                amount_data_loss += EPNLeaf_to_EPN[i * int(num_EPN/num_EPNLeaf) + j]
             canvas.create_line(size_EPNLeaf/2+750, i*size_EPNLeaf*2+size_EPNLeaf/2+(10+size_EPNLeaf/2), 850+((i*int(num_EPN/num_EPNLeaf)+j)%EPN_per_row)*2*size_EPN, math.floor((i*int(num_EPN/num_EPNLeaf)+j)/EPN_per_row)*size_EPN*2 + size_EPN/2+10, fill=color, width=lineWeight)
 
 
@@ -653,8 +679,13 @@ for i in range(rounds_displayed):
         for j in range(num_FLPLeaf * num_Core * cap_FLPLeaf_to_Core):
             plottingArray_FLP_cr[j, i] = FLPLeaf_to_Core[j]
 
+        for j in range(num_FLP):
+            plottingArray_FLPsend[j, i] = FLP_send[j]
+
     for j in range(len(Core_to_EPNLeaf)):
-        plottingArray_amounts[int(Core_to_EPNLeaf[j]/25)] += 1
+        plottingArrayEPN_amounts[int(Core_to_EPNLeaf[j]/25)] += 1
+    for j in range(len(FLPLeaf_to_Core)):
+        plottingArrayFLP_amounts[int(FLPLeaf_to_Core[j]/25)] += 1
 
 
     #draw the calculated variables
@@ -666,11 +697,18 @@ for i in range(rounds_displayed):
     canvas.delete(ALL)
 
     round += 1
+    print(round)
 
 
 ##### --------------------------- DEBUGGING AND CALCULATIONS (after simulation is finished) ---------------------------
 
-print(plottingArray_amounts)
+#print(plottingArrayEPN_amounts)
+print("Amount of overflows: " + str(amount_overflows))
+print("Amount of lost data: " + str(amount_data_loss/40) + " GB")
+print("Standard deviation in FLPLeaf-Core: " + str(statistics.stdev(FLPLeaf_to_Core_total)))
+print("Standard deviation in Core-EPNLeaf: " + str(statistics.stdev(Core_to_EPNLeaf_total)))
+
+print(FLPLeaf_to_Core_total)
 
 if(plottingMode>0):
 
@@ -743,9 +781,35 @@ if(plottingMode>0):
     plt.show()
 
 
+    #Plot for sending FLPs
+    fig4, ax4 = plt.subplots()
+    ax4.set_title("Scheme of sending FLPs")
+    im4 = ax4.imshow(plottingArray_FLPsend)
+    fig4.tight_layout()
+    plt.figure(1, figsize=(20, 23))
+    cmap4 = plt.get_cmap('Blues')
+    plt.imshow(plottingArray_FLPsend, interpolation='none', cmap=cmap4)
+    plt.xlabel("time intervals (25ms)")
+
+    plt.show()
+
+
+
     #Plot for histogram
-    N = len(plottingArray_amounts)
+    N = len(plottingArrayEPN_amounts)
     x = [0,25,50,75,100,125,150,175,200,225,250,275,300,325,350,375,400,425,450,475,500]
     width = 20
-    plt.bar(x, plottingArray_amounts, width, color="blue")
+    plt.bar(x, plottingArrayEPN_amounts, width, color="blue")
+    plt.title("Distribution of link utilizations at Core-EPNLeaf Layer")
+    plt.xlabel("utilization rate")
+    plt.ylabel("frequency")
+    plt.show()
+
+    N = len(plottingArrayEPN_amounts)
+    x = [0, 25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300, 325, 350, 375, 400, 425, 450, 475, 500]
+    width = 20
+    plt.bar(x, plottingArrayFLP_amounts, width, color="blue")
+    plt.title("Distribution of link utilizations at FLPLeaf-Core Layer")
+    plt.xlabel("utilization rate")
+    plt.ylabel("frequency")
     plt.show()
