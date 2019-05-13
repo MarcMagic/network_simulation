@@ -33,14 +33,16 @@ onlyOverflow = 0
 #Simulation data
 FLP_sending_rate = 25
 EPN_receiving_rate = 100
-processing_time_mean = 38           #36 seconds is the maximum limitation
+processing_time_mean = 30           #36 seconds is the maximum limitation
 
-speed = 0
-rounds_displayed = 3000
+speed = 0.1
+rounds_displayed = 5
 
 #key figures
-amount_overflows = 0
-amount_data_loss = 0
+amount_overflows_flp = 0
+amount_overflows_epn = 0
+amount_data_loss_flp = 0
+amount_data_loss_epn = 0
 sd_FLPLeaf_Core = 0
 sd_Core_EPNLeaf = 0
 
@@ -527,17 +529,18 @@ def drawConnections():
             if FLPLeaf_to_Core[i*num_Core*3+j*3] > 200 or FLPLeaf_to_Core[i*num_Core*3+j*3+1] > 200 or FLPLeaf_to_Core[i*num_Core*3+j*3+2] > 200:
                 color = 'red'
                 lineWeight = 3
+                print("Overflow in FLPLeaf-Core")
                 global overflow_rounds_FLPLeaf_Core
                 overflow_rounds_FLPLeaf_Core[round] = 1
-                global amount_overflows
-                global amount_data_loss
-                amount_overflows += 1
+                global amount_overflows_flp
+                global amount_data_loss_flp
+                amount_overflows_flp += 1
                 if FLPLeaf_to_Core[i*num_Core*3+j*3] > 200:
-                    amount_data_loss += FLPLeaf_to_Core[i*num_Core*3+j*3]
+                    amount_data_loss_flp += FLPLeaf_to_Core[i*num_Core*3+j*3]
                 if FLPLeaf_to_Core[i*num_Core*3+j*3+1] > 200:
-                    amount_data_loss += FLPLeaf_to_Core[i*num_Core*3+j*3+1]
+                    amount_data_loss_flp += FLPLeaf_to_Core[i*num_Core*3+j*3+1]
                 if FLPLeaf_to_Core[i*num_Core*3+j*3+2] > 200:
-                    amount_data_loss += FLPLeaf_to_Core[i*num_Core*3+j*3+2]
+                    amount_data_loss_flp += FLPLeaf_to_Core[i*num_Core*3+j*3+2]
             canvas.create_line(size_FLPLeaf/2+200, i*size_FLPLeaf*2+(10+size_FLPLeaf/2)+size_FLPLeaf/2, 450, j*size_Core*2+(10+size_Core/2)+size_Core/2, fill=color, width=lineWeight)
 
     for i in range(num_Core):
@@ -554,9 +557,11 @@ def drawConnections():
                 color = 'red'
                 lineWeight = 3
                 global overflow_rounds_Core_EPNLeaf
+                global amount_overflows_epn
+                global amount_data_loss_epn
                 overflow_rounds_Core_EPNLeaf[round] = 1
-                amount_overflows += 1
-                amount_data_loss += Core_to_EPNLeaf[i * num_EPNLeaf + j]
+                amount_overflows_epn += 1
+                amount_data_loss_epn += Core_to_EPNLeaf[i * num_EPNLeaf + j]
             canvas.create_line(size_Core/2+450, i*size_Core*2+(10+size_Core/2)+size_Core/2, 750, j*size_EPNLeaf*2+(10+size_EPNLeaf/2)+size_EPNLeaf/2, fill=color, width=lineWeight)
 
     for i in range(num_EPNLeaf):
@@ -574,8 +579,6 @@ def drawConnections():
                 lineWeight = 2
                 global overflow_rounds_EPNLeaf_EPN
                 overflow_rounds_EPNLeaf_EPN[round] = 1
-                amount_overflows += 1
-                amount_data_loss += EPNLeaf_to_EPN[i * int(num_EPN/num_EPNLeaf) + j]
             canvas.create_line(size_EPNLeaf/2+750, i*size_EPNLeaf*2+size_EPNLeaf/2+(10+size_EPNLeaf/2), 850+((i*int(num_EPN/num_EPNLeaf)+j)%EPN_per_row)*2*size_EPN, math.floor((i*int(num_EPN/num_EPNLeaf)+j)/EPN_per_row)*size_EPN*2 + size_EPN/2+10, fill=color, width=lineWeight)
 
 
@@ -703,12 +706,17 @@ for i in range(rounds_displayed):
 ##### --------------------------- DEBUGGING AND CALCULATIONS (after simulation is finished) ---------------------------
 
 #print(plottingArrayEPN_amounts)
-print("Amount of overflows: " + str(amount_overflows))
-print("Amount of lost data: " + str(amount_data_loss/40) + " GB")
+print("Amount of overflows in FLPLeaf-Core: " + str(amount_overflows_flp))
+print("Amount of overflows in Core-EPNLeaf: " + str(amount_overflows_epn))
+print("Amount of lost data in FLPLeaf-Core: " + str(amount_data_loss_flp/40) + " GB")
+print("Amount of lost data in Core-EPNLeaf: " + str(amount_data_loss_epn/40) + " GB")
 print("Standard deviation in FLPLeaf-Core: " + str(statistics.stdev(FLPLeaf_to_Core_total)))
 print("Standard deviation in Core-EPNLeaf: " + str(statistics.stdev(Core_to_EPNLeaf_total)))
 
-print(FLPLeaf_to_Core_total)
+print("Mean in FLPLeaf-Core: " + str(sum(FLPLeaf_to_Core_total)/len(FLPLeaf_to_Core_total)))
+print("Mean in Core-EPNLeaf: " + str(sum(Core_to_EPNLeaf_total)/len(Core_to_EPNLeaf_total)))
+
+
 
 if(plottingMode>0):
 
@@ -731,12 +739,12 @@ if(plottingMode>0):
 
     with np.nditer(plottingArray_cr_EPN, op_flags=['readwrite']) as it:
         for x in it:
-            if x<200:
+            if x<=200:
                 x[...] = 0
 
     with np.nditer(plottingArray_FLP_cr, op_flags=['readwrite']) as it:
         for x in it:
-            if x<200:
+            if x<=200:
                 x[...] = 0
 
 
@@ -775,6 +783,8 @@ if(plottingMode>0):
     im3 = ax3.imshow(plottingArray_FLP_cr)
     fig3.tight_layout()
     cmap3 = plt.get_cmap('Blues')
+    plt.xlabel("time intervals")
+    plt.ylabel("link indices")
     plt.imshow(plottingArray_FLP_cr, interpolation='none', cmap=cmap3)
     #plt.colorbar()
 
@@ -800,8 +810,8 @@ if(plottingMode>0):
     x = [0,25,50,75,100,125,150,175,200,225,250,275,300,325,350,375,400,425,450,475,500]
     width = 20
     plt.bar(x, plottingArrayEPN_amounts, width, color="blue")
-    plt.title("Distribution of link utilizations at Core-EPNLeaf Layer")
-    plt.xlabel("utilization rate")
+    plt.title("Distribution of Link Utilisations at Core-EPNLeaf Layer")
+    plt.xlabel("utilisation rate")
     plt.ylabel("frequency")
     plt.show()
 
@@ -809,7 +819,22 @@ if(plottingMode>0):
     x = [0, 25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300, 325, 350, 375, 400, 425, 450, 475, 500]
     width = 20
     plt.bar(x, plottingArrayFLP_amounts, width, color="blue")
-    plt.title("Distribution of link utilizations at FLPLeaf-Core Layer")
-    plt.xlabel("utilization rate")
+    plt.title("Distribution of Link Utilisations at FLPLeaf-Core Layer")
+    plt.xlabel("utilisation rate")
     plt.ylabel("frequency")
     plt.show()
+
+
+
+print(FLP)
+print(FLP_send)
+print(EPN)
+print(EPN_process)
+print(EPN_slots)
+print(FLPLeaf)
+print(Core)
+print(EPNLeaf)
+print(FLP_to_FLPLeaf)
+print(FLPLeaf_to_Core)
+print(Core_to_EPNLeaf)
+print(EPNLeaf_to_EPN)
