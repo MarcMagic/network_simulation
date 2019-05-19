@@ -12,6 +12,7 @@ matplotlib.rcParams['text.latex.unicode'] = True
 matplotlib.rc('font', **{
         'weight' : 'bold',
         'size'   : 12})
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 np.set_printoptions(threshold=sys.maxsize)
 
@@ -22,7 +23,7 @@ np.set_printoptions(threshold=sys.maxsize)
 FindEPN = 1
 
 #Simulation mode random=0, logic=1
-FindCore = 1
+FindCore = 0
 
 #Plotting mode none=0 FLPLeaf-Core=1 Core-EPNLeaf=2 EPNs=3 ThesisMode=4
 plottingMode = 0
@@ -31,12 +32,12 @@ plottingMode = 0
 onlyOverflow = 0
 
 #Simulation data
-FLP_sending_rate = 25
+FLP_sending_rate = 75
 EPN_receiving_rate = 100
 processing_time_mean = 30           #36 seconds is the maximum limitation
 
-speed = 0.1
-rounds_displayed = 5
+speed = 0
+rounds_displayed = 100
 
 #key figures
 amount_overflows_flp = 0
@@ -199,6 +200,8 @@ plottingArray_FLPsend = np.zeros((num_FLP, rounds_displayed))
 
 plottingArrayEPN_amounts = np.zeros(21)
 plottingArrayFLP_amounts = np.zeros(21)
+
+
 
 
 
@@ -405,19 +408,19 @@ def findNodes():
         if(EPN[i]>=160*FLP_sending_rate):
             EPN[i] = 0
             processing_time = 0
-            randInt = 1 #random.randint(0,99)
-            if(randInt<63):
-                processing_time=processing_time_mean
-            elif(randInt>=63 and randInt<86):
-                processing_time=processing_time_mean+1
-            elif(randInt>=86 and randInt<94):
-                processing_time=processing_time_mean+2
-            elif(randInt>=94 and randInt<97):
-                processing_time=processing_time_mean+3
-            elif(randInt>=97 and randInt<99):
-                processing_time=processing_time_mean+4
+            randInt = random.randint(0,99)
+            if (randInt < 63):
+                processing_time = processing_time_mean
+            elif (randInt >= 63 and randInt < 86):
+                processing_time = processing_time_mean + 1
+            elif (randInt >= 86 and randInt < 94):
+                processing_time = processing_time_mean + 2
+            elif (randInt >= 94 and randInt < 97):
+                processing_time = processing_time_mean + 3
+            elif (randInt >= 97 and randInt < 99):
+                processing_time = processing_time_mean + 4
             else:
-                processing_time=processing_time_mean+5
+                processing_time = processing_time_mean + 5
             if (EPN_process[i][0] == 0):
                 EPN_process[i][0] += processing_time*40
             else:
@@ -536,11 +539,11 @@ def drawConnections():
                 global amount_data_loss_flp
                 amount_overflows_flp += 1
                 if FLPLeaf_to_Core[i*num_Core*3+j*3] > 200:
-                    amount_data_loss_flp += FLPLeaf_to_Core[i*num_Core*3+j*3]
+                    amount_data_loss_flp += FLPLeaf_to_Core[i*num_Core*3+j*3]-200
                 if FLPLeaf_to_Core[i*num_Core*3+j*3+1] > 200:
-                    amount_data_loss_flp += FLPLeaf_to_Core[i*num_Core*3+j*3+1]
+                    amount_data_loss_flp += FLPLeaf_to_Core[i*num_Core*3+j*3+1]-200
                 if FLPLeaf_to_Core[i*num_Core*3+j*3+2] > 200:
-                    amount_data_loss_flp += FLPLeaf_to_Core[i*num_Core*3+j*3+2]
+                    amount_data_loss_flp += FLPLeaf_to_Core[i*num_Core*3+j*3+2]-200
             canvas.create_line(size_FLPLeaf/2+200, i*size_FLPLeaf*2+(10+size_FLPLeaf/2)+size_FLPLeaf/2, 450, j*size_Core*2+(10+size_Core/2)+size_Core/2, fill=color, width=lineWeight)
 
     for i in range(num_Core):
@@ -561,7 +564,7 @@ def drawConnections():
                 global amount_data_loss_epn
                 overflow_rounds_Core_EPNLeaf[round] = 1
                 amount_overflows_epn += 1
-                amount_data_loss_epn += Core_to_EPNLeaf[i * num_EPNLeaf + j]
+                amount_data_loss_epn += Core_to_EPNLeaf[i * num_EPNLeaf + j]-200
             canvas.create_line(size_Core/2+450, i*size_Core*2+(10+size_Core/2)+size_Core/2, 750, j*size_EPNLeaf*2+(10+size_EPNLeaf/2)+size_EPNLeaf/2, fill=color, width=lineWeight)
 
     for i in range(num_EPNLeaf):
@@ -686,9 +689,9 @@ for i in range(rounds_displayed):
             plottingArray_FLPsend[j, i] = FLP_send[j]
 
     for j in range(len(Core_to_EPNLeaf)):
-        plottingArrayEPN_amounts[int(Core_to_EPNLeaf[j]/25)] += 1
+        plottingArrayEPN_amounts[int(Core_to_EPNLeaf[j]/FLP_sending_rate)] += 1
     for j in range(len(FLPLeaf_to_Core)):
-        plottingArrayFLP_amounts[int(FLPLeaf_to_Core[j]/25)] += 1
+        plottingArrayFLP_amounts[int(FLPLeaf_to_Core[j]/FLP_sending_rate)] += 1
 
 
     #draw the calculated variables
@@ -705,16 +708,32 @@ for i in range(rounds_displayed):
 
 ##### --------------------------- DEBUGGING AND CALCULATIONS (after simulation is finished) ---------------------------
 
+mathArrayFLP = []
+mathArrayEPN = []
+
+for x in range(len(plottingArrayFLP_amounts)):
+    for y in range(int(plottingArrayFLP_amounts[x])):
+        mathArrayFLP.append(x*FLP_sending_rate)
+for x in range(len(plottingArrayEPN_amounts)):
+    for y in range(int(plottingArrayEPN_amounts[x])):
+        mathArrayEPN.append(x*FLP_sending_rate)
+
+
+
+
 #print(plottingArrayEPN_amounts)
 print("Amount of overflows in FLPLeaf-Core: " + str(amount_overflows_flp))
 print("Amount of overflows in Core-EPNLeaf: " + str(amount_overflows_epn))
 print("Amount of lost data in FLPLeaf-Core: " + str(amount_data_loss_flp/40) + " GB")
 print("Amount of lost data in Core-EPNLeaf: " + str(amount_data_loss_epn/40) + " GB")
-print("Standard deviation in FLPLeaf-Core: " + str(statistics.stdev(FLPLeaf_to_Core_total)))
-print("Standard deviation in Core-EPNLeaf: " + str(statistics.stdev(Core_to_EPNLeaf_total)))
+print("Standard deviation in FLPLeaf-Core: " + str(statistics.stdev(mathArrayFLP)))
+print("Standard deviation in Core-EPNLeaf: " + str(statistics.stdev(mathArrayEPN)))
+print("Mean in FLPLeaf-Core: " + str(statistics.mean(mathArrayFLP)))
+print("Mean in Core-EPNLeaf: " + str(statistics.mean(mathArrayEPN)))
 
-print("Mean in FLPLeaf-Core: " + str(sum(FLPLeaf_to_Core_total)/len(FLPLeaf_to_Core_total)))
-print("Mean in Core-EPNLeaf: " + str(sum(Core_to_EPNLeaf_total)/len(Core_to_EPNLeaf_total)))
+print(plottingArrayEPN_amounts)
+
+
 
 
 
@@ -757,13 +776,12 @@ if(plottingMode>0):
 
     ax.set_yticks([0,54,108,162,216,270,324,378,432,486,540,594,648,702,756])
     ax.set_yticklabels([0,54,108,162,216,270,324,378,432,486,540,594,648,702,756])
-
+    ax.set_ylabel("EPN indices")
+    ax.set_xlabel("time interval (25ms)")
     ax.set_title(plotName + "| for " + str(rounds_displayed) + " rounds.")
     fig.tight_layout()
     cmap = plt.get_cmap('Blues')
     plt.imshow(plottingArray, interpolation='none', cmap=cmap)
-    #plt.colorbar()
-
     plt.show()
 
     #Plot for Connections between Core and EPNLeafs
@@ -773,46 +791,45 @@ if(plottingMode>0):
     fig2.tight_layout()
     cmap2 = plt.get_cmap('Blues')
     plt.imshow(plottingArray_cr_EPN, interpolation='none', cmap=cmap2)
-    #plt.colorbar()
-
     plt.show()
 
     #Plot for Connections between FLPLeafs and Core
-    fig3, ax3 = plt.subplots()
-    ax3.set_title("Connections FLPLeaf to Core")
-    im3 = ax3.imshow(plottingArray_FLP_cr)
+    fig3, ax = plt.subplots()
+    ax.set_title("Connections FLPLeaf to Core")
+    im3 = ax.imshow(plottingArray_FLP_cr)
     fig3.tight_layout()
     cmap3 = plt.get_cmap('Blues')
     plt.xlabel("time intervals")
     plt.ylabel("link indices")
-    plt.imshow(plottingArray_FLP_cr, interpolation='none', cmap=cmap3)
-    #plt.colorbar()
-
+    kax = ax.imshow(plottingArray_FLP_cr, interpolation='none', cmap=cmap3)
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(kax, cax=cax)
     plt.show()
 
 
     #Plot for sending FLPs
-    fig4, ax4 = plt.subplots()
-    ax4.set_title("Scheme of sending FLPs")
-    im4 = ax4.imshow(plottingArray_FLPsend)
-    fig4.tight_layout()
-    plt.figure(1, figsize=(20, 23))
+    fig4, ax = plt.subplots()
     cmap4 = plt.get_cmap('Blues')
-    plt.imshow(plottingArray_FLPsend, interpolation='none', cmap=cmap4)
+    cax = ax.imshow(plottingArray_FLPsend, interpolation='none', cmap=cmap4)
+    ax.set_title("Scheme of sending FLPs")
+    cbar = fig4.colorbar(cax, ticks=[0, 1])
+    cbar.ax.set_yticklabels(['buffering', 'sending'])
     plt.xlabel("time intervals (25ms)")
-
+    plt.ylabel("FLP indices")
     plt.show()
 
 
 
     #Plot for histogram
     N = len(plottingArrayEPN_amounts)
-    x = [0,25,50,75,100,125,150,175,200,225,250,275,300,325,350,375,400,425,450,475,500]
+    x = [0,25,50,75,100,125,150,175,200, 225, 250, 275, 300, 325, 350, 375, 400, 425, 450, 475, 500]
     width = 20
     plt.bar(x, plottingArrayEPN_amounts, width, color="blue")
     plt.title("Distribution of Link Utilisations at Core-EPNLeaf Layer")
-    plt.xlabel("utilisation rate")
-    plt.ylabel("frequency")
+    plt.xlabel("utilisation rate (Gb/s)")
+    plt.ylabel("number of overflows")
+    plt.yscale('log')
     plt.show()
 
     N = len(plottingArrayEPN_amounts)
@@ -820,21 +837,7 @@ if(plottingMode>0):
     width = 20
     plt.bar(x, plottingArrayFLP_amounts, width, color="blue")
     plt.title("Distribution of Link Utilisations at FLPLeaf-Core Layer")
-    plt.xlabel("utilisation rate")
-    plt.ylabel("frequency")
+    plt.xlabel("utilisation rate (Gb/s)")
+    plt.ylabel("number of overflows")
+    #plt.yscale('log')
     plt.show()
-
-
-
-print(FLP)
-print(FLP_send)
-print(EPN)
-print(EPN_process)
-print(EPN_slots)
-print(FLPLeaf)
-print(Core)
-print(EPNLeaf)
-print(FLP_to_FLPLeaf)
-print(FLPLeaf_to_Core)
-print(Core_to_EPNLeaf)
-print(EPNLeaf_to_EPN)
